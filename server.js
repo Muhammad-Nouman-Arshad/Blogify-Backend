@@ -23,28 +23,23 @@ connectDB();
 // --------------------------------------------------
 // 🌐 GLOBAL MIDDLEWARES
 // --------------------------------------------------
-
-// Security HTTP headers
 app.use(
   helmet({
-    crossOriginResourcePolicy: false, // Allow images from Cloudinary
+    crossOriginResourcePolicy: false,
   })
 );
 
-// Logging (dev only)
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// Enable CORS
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL, // Allowed frontend domain
+    origin: process.env.FRONTEND_URL,
     credentials: true,
   })
 );
 
-// Body parsers
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -55,32 +50,24 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/posts", require("./routes/postRoutes"));
 app.use("/api/comments", require("./routes/commentRoutes"));
-app.use("/api/admin", require("./routes/adminRoutes")); // Admin routes
+app.use("/api/admin", require("./routes/adminRoutes"));
 
 // Root Endpoint
 app.get("/", (req, res) => {
   res.send("Blogify API is running...");
 });
 
-// --------------------------------------------------
-// ❌ 404 Handler
-// --------------------------------------------------
+// 404 Handler
 app.use((req, res, next) => {
-  res.status(404).json({
-    message: "Route not found",
-  });
+  res.status(404).json({ message: "Route not found" });
 });
 
-// --------------------------------------------------
-// ⚠️ GLOBAL ERROR HANDLER (Always last)
-// --------------------------------------------------
+// Error Handler
 app.use(errorHandler);
 
 // --------------------------------------------------
-// 🟢 START SERVER
+// ❗ NO app.listen() in Vercel
 // --------------------------------------------------
-const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV} mode`)
-);
+// Export for Vercel Serverless Function
+module.exports = app;
