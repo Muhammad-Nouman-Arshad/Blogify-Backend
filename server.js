@@ -1,3 +1,5 @@
+// server.js
+
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -6,26 +8,26 @@ const helmet = require("helmet");
 const connectDB = require("./config/db");
 const errorHandler = require("./middleware/errorMiddleware");
 
-// Load env
+// Load .env
 dotenv.config();
 
-// Create app
+// Create App
 const app = express();
 
-// MongoDB Connection
+// Connect MongoDB
 connectDB();
 
-// Security
+// Security Middlewares
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
   })
 );
 
-// CORS
+// CORS Setup
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL,
+    origin: process.env.FRONTEND_URL || "*",
     credentials: true,
   })
 );
@@ -34,7 +36,7 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Logs in Dev Mode
+// Logging (Dev only)
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
@@ -46,9 +48,9 @@ app.use("/api/posts", require("./routes/postRoutes"));
 app.use("/api/comments", require("./routes/commentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 
-// Root testing
+// Root
 app.get("/", (req, res) => {
-  res.send("Blogify API running on Vercel 🚀");
+  res.send("Blogify Backend running on Render 🚀");
 });
 
 // 404 Handler
@@ -59,5 +61,8 @@ app.use((req, res) => {
 // Error Handler
 app.use(errorHandler);
 
-// ❗ IMPORTANT — NO app.listen() for Vercel
-module.exports = app;
+// ✅ Render requires normal app.listen()
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
