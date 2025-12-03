@@ -1,38 +1,28 @@
-// server.js
-
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const morgan = require("morgan");
 const helmet = require("helmet");
-
 const connectDB = require("./config/db");
 const errorHandler = require("./middleware/errorMiddleware");
 
-// Load environment variables
+// Load env
 dotenv.config();
 
-// Initialize Express app
+// Create app
 const app = express();
 
-// --------------------------------------------------
-// 🔗 Connect to MongoDB
-// --------------------------------------------------
+// MongoDB Connection
 connectDB();
 
-// --------------------------------------------------
-// 🌐 GLOBAL MIDDLEWARES
-// --------------------------------------------------
+// Security
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
   })
 );
 
-if (process.env.NODE_ENV === "development") {
-  app.use(morgan("dev"));
-}
-
+// CORS
 app.use(
   cors({
     origin: process.env.FRONTEND_URL,
@@ -40,34 +30,34 @@ app.use(
   })
 );
 
+// Body Parsers
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// --------------------------------------------------
-// 🚀 API ROUTES
-// --------------------------------------------------
+// Logs in Dev Mode
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
+}
+
+// Routes
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/posts", require("./routes/postRoutes"));
 app.use("/api/comments", require("./routes/commentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 
-// Root Endpoint
+// Root testing
 app.get("/", (req, res) => {
-  res.send("Blogify API is running...");
+  res.send("Blogify API running on Vercel 🚀");
 });
 
 // 404 Handler
-app.use((req, res, next) => {
+app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
 // Error Handler
 app.use(errorHandler);
 
-// --------------------------------------------------
-// ❗ NO app.listen() in Vercel
-// --------------------------------------------------
-
-// Export for Vercel Serverless Function
+// ❗ IMPORTANT — NO app.listen() for Vercel
 module.exports = app;
