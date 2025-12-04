@@ -36,16 +36,10 @@ const postSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Cloudinary cover image
-    coverImage: {
-      type: String,
-      default: "",
-    },
-
     // ⭐ MULTIPLE CATEGORIES SUPPORTED
     categories: {
       type: [String],
-      default: ["General"], // Default category
+      default: ["General"],
       validate: {
         validator: function (arr) {
           return arr.every((cat) => VALID_CATEGORIES.includes(cat));
@@ -54,7 +48,7 @@ const postSchema = new mongoose.Schema(
       },
     },
 
-    // ⭐ TAG SYSTEM
+    // ⭐ TAG SYSTEM (optional for future)
     tags: {
       type: [String],
       default: [],
@@ -68,7 +62,7 @@ const postSchema = new mongoose.Schema(
       },
     ],
 
-    // ADMIN APPROVAL (unpublished/published)
+    // ADMIN APPROVAL (Publish / Unpublish)
     isPublished: {
       type: Boolean,
       default: true,

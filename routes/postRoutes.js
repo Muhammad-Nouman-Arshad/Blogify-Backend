@@ -8,42 +8,46 @@ const {
   updatePost,
   deletePost,
   toggleLike,
-  toggleApprovePost, // ✅ NEW
+  toggleApprovePost,
+  searchPosts, // ✅ ADD THIS
 } = require("../controllers/postController");
 
 const auth = require("../middleware/authMiddleware");
 const admin = require("../middleware/adminMiddleware");
-const upload = require("../middleware/uploadMiddleware");
+
+
+// ====================================================
+// ⭐ SEARCH ROUTE (must be BEFORE :id route)
+// ====================================================
+router.get("/search/query", searchPosts);
 
 
 // ====================================================
 // ⭐ PUBLIC ROUTES
 // ====================================================
 
-// Get all posts (only published posts are shown)
+// Get all posts
 router.get("/", getAllPosts);
 
-// Single post
+// Get single post
 router.get("/:id", getPostById);
-
 
 
 // ====================================================
 // 🔒 AUTHENTICATED USER ROUTES
 // ====================================================
 
-// Create post (user must be logged in)
-router.post("/", auth, upload.single("coverImage"), createPost);
+// Create post (NO image upload now)
+router.post("/", auth, createPost);
 
-// Update your own post
-router.put("/:id", auth, upload.single("coverImage"), updatePost);
+// Update post (NO image upload now)
+router.put("/:id", auth, updatePost);
 
 // Delete your own post
 router.delete("/:id", auth, deletePost);
 
-// Like / Unlike post
+// Like / Unlike
 router.post("/:id/like", auth, toggleLike);
-
 
 
 // ====================================================
@@ -52,7 +56,6 @@ router.post("/:id/like", auth, toggleLike);
 
 // Approve / Unapprove post
 router.patch("/:id/approve", auth, admin, toggleApprovePost);
-
 
 
 module.exports = router;

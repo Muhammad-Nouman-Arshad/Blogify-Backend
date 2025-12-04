@@ -1,44 +1,21 @@
 const Post = require("../models/Post");
-const cloudinary = require("../config/cloudinary");
-const fs = require("fs");
+
 
 // =========================================================
 //  CREATE POST
 // =========================================================
 exports.createPost = async (req, res) => {
   try {
-    const { title, content } = req.body;
+    const { title, content, categories } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({ message: "Title and content are required" });
     }
 
-    // ✅ FIX CATEGORY ARRAY (handles FormData JSON)
-    let categories = [];
-    if (req.body.categories) {
-      try {
-        categories = JSON.parse(req.body.categories);
-      } catch {
-        categories = [req.body.categories];
-      }
-    }
-
-    let coverImage = "";
-
-    // Image upload
-    if (req.file) {
-      const upload = await cloudinary.uploader.upload(req.file.path, {
-        folder: "blogify/posts",
-      });
-      coverImage = upload.secure_url;
-      fs.unlinkSync(req.file.path);
-    }
-
     const post = await Post.create({
       title,
       content,
-      categories: categories.length ? categories : [],
-      coverImage,
+      categories: Array.isArray(categories) ? categories : [],
       author: req.user.id,
     });
 
@@ -51,6 +28,7 @@ exports.createPost = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 // =========================================================
 //  GET ALL POSTS
@@ -67,6 +45,7 @@ exports.getAllPosts = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 // =========================================================
 //  GET SINGLE POST
@@ -86,42 +65,27 @@ exports.getPostById = async (req, res) => {
   }
 };
 
+
 // =========================================================
 //  UPDATE POST
 // =========================================================
 exports.updatePost = async (req, res) => {
   try {
-    const { title, content } = req.body;
-    const post = await Post.findById(req.params.id);
+    const { title, content, categories } = req.body;
 
+    const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     if (post.author.toString() !== req.user.id) {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    // Handle categories (FormData + JSON)
-    let categories = post.categories;
-    if (req.body.categories) {
-      try {
-        categories = JSON.parse(req.body.categories);
-      } catch {
-        categories = [req.body.categories];
-      }
-    }
-
-    // Image replacement
-    if (req.file) {
-      const upload = await cloudinary.uploader.upload(req.file.path, {
-        folder: "blogify/posts",
-      });
-      post.coverImage = upload.secure_url;
-      fs.unlinkSync(req.file.path);
-    }
-
     post.title = title || post.title;
     post.content = content || post.content;
-    post.categories = categories;
+
+    if (Array.isArray(categories)) {
+      post.categories = categories;
+    }
 
     await post.save();
 
@@ -135,9 +99,11 @@ exports.updatePost = async (req, res) => {
   }
 };
 
+
 // =========================================================
-//  DELETE POST
+// DELETE POST
 // =========================================================
+
 exports.deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -156,13 +122,13 @@ exports.deletePost = async (req, res) => {
   }
 };
 
+
 // =========================================================
 //  LIKE / UNLIKE
 // =========================================================
 exports.toggleLike = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     const userId = req.user.id;
@@ -183,13 +149,13 @@ exports.toggleLike = async (req, res) => {
   }
 };
 
+
 // =========================================================
-//  APPROVE / UNAPPROVE (ADMIN ONLY)
+//  APPROVE / UNAPPROVE POST (ADMIN)
 // =========================================================
 exports.toggleApprovePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     post.isPublished = !post.isPublished;
@@ -203,6 +169,61 @@ exports.toggleApprovePost = async (req, res) => {
     });
   } catch (error) {
     console.error("Approve post error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+// =========================================================
+//  SMART SEARCH (AI-LIKE RANKING)
+// =========================================================
+exports.searchPosts = async (req, res) => {
+  try {
+    const query = req.query.q?.toLowerCase() || "";
+
+    if (!query) {
+      return res.json([]);
+    }
+
+    // break into words
+    const keywords = query.split(" ");
+
+    const posts = await Post.find().populate("author", "name");
+
+    const scored = posts.map((post) => {
+      let score = 0;
+
+      const title = post.title.toLowerCase();
+      const content = post.content.toLowerCase();
+      const categories = post.categories.join(" ").toLowerCase();
+      const author = post.author?.name?.toLowerCase() || "";
+
+      // scoring system
+      keywords.forEach((k) => {
+        if (title.includes(k)) score += 6;
+        if (content.includes(k)) score += 4;
+        if (categories.includes(k)) score += 5;
+        if (author.includes(k)) score += 3;
+      });
+
+      return { post, score };
+    });
+
+    const matched = scored
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((s) => s.post);
+
+    // fallback: related content
+    if (matched.length === 0) {
+      const related = posts.slice(0, 5);
+      return res.json({ related });
+    }
+
+    return res.json({ results: matched });
+
+  } catch (error) {
+    console.error("Search error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
