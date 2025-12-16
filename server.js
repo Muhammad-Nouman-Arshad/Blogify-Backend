@@ -6,31 +6,21 @@ const dotenv = require("dotenv");
 const morgan = require("morgan");
 const helmet = require("helmet");
 const mongoose = require("mongoose");
-const connectDB = require("./config/db");
 const errorHandler = require("./middleware/errorMiddleware");
 
-// Load .env
+// Load env
 dotenv.config();
 
-// Create App
+// App
 const app = express();
 
-// Connect MongoDB (For Vercel keep connection cached)
-let isConnected = false;
-async function connectToMongoDB() {
-  if (isConnected) return;
+// MongoDB
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB Connected ✔"))
+  .catch((err) => console.error("MongoDB Error:", err));
 
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-    isConnected = true;
-    console.log("MongoDB Connected ✔");
-  } catch (error) {
-    console.log("MongoDB Error:", error);
-  }
-}
-connectToMongoDB();
-
-// Security Middlewares
+// Security
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
@@ -45,11 +35,11 @@ app.use(
   })
 );
 
-// Parsers
+// Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Logging
+// Logger
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
@@ -63,7 +53,7 @@ app.use("/api/admin", require("./routes/adminRoutes"));
 
 // Root
 app.get("/", (req, res) => {
-  res.send("Blogify Backend Running on Vercel 🚀");
+  res.send("Blogify Backend Running on Render 🚀");
 });
 
 // 404
@@ -71,9 +61,11 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Error Middleware
+// Error handler
 app.use(errorHandler);
 
-// ❌ NO app.listen() on Vercel
-// Instead, EXPORT the app
-module.exports = app;
+// ✅ LISTEN (RENDER NEEDS THIS)
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () =>
+  console.log(`Server running on port ${PORT}`)
+);
