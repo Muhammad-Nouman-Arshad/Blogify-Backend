@@ -1,11 +1,10 @@
-// server.js
-
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const morgan = require("morgan");
 const helmet = require("helmet");
 const mongoose = require("mongoose");
+const serverless = require("serverless-http");
 const errorHandler = require("./middleware/errorMiddleware");
 
 // Load env
@@ -51,9 +50,9 @@ app.use("/api/posts", require("./routes/postRoutes"));
 app.use("/api/comments", require("./routes/commentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 
-// Root
+// Root test
 app.get("/", (req, res) => {
-  res.send("Blogify Backend Running on Render 🚀");
+  res.send("Blogify Backend Running on Vercel 🚀");
 });
 
 // 404
@@ -64,8 +63,6 @@ app.use((req, res) => {
 // Error handler
 app.use(errorHandler);
 
-// ✅ LISTEN (RENDER NEEDS THIS)
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`Server running on port ${PORT}`)
-);
+// ❌ DO NOT use app.listen() on Vercel
+// ✅ Export serverless handler
+module.exports = serverless(app);
