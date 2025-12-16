@@ -10,33 +10,23 @@ dotenv.config();
 
 const app = express();
 
-// MongoDB
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected ✔"))
-  .catch((err) => console.error("MongoDB Error:", err));
+// MongoDB (Vercel safe)
+let isConnected = false;
+async function connectDB() {
+  if (isConnected) return;
+  await mongoose.connect(process.env.MONGO_URI);
+  isConnected = true;
+  console.log("MongoDB Connected ✔");
+}
+connectDB();
 
-// Security
-app.use(
-  helmet({
-    crossOriginResourcePolicy: false,
-  })
-);
-
-// CORS
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "*",
-    credentials: true,
-  })
-);
-
-// Body parsers
+// Middlewares
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Logger
-if (process.env.NODE_ENV !== "production") {
+if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
@@ -47,13 +37,15 @@ app.use("/api/posts", require("./routes/postRoutes"));
 app.use("/api/comments", require("./routes/commentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 
-// Root (TEST)
+// Root test
 app.get("/", (req, res) => {
   res.send("Blogify Backend Running on Vercel 🚀");
 });
 
-// Error Handler
+// Error handlers
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
 app.use(errorHandler);
 
-// ❌ DO NOT app.listen() on Vercel
-module.exports = app;
+module.exports = app; // ⬅️ VERY IMPORTANT
