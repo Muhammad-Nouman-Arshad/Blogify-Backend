@@ -7,55 +7,39 @@ const {
   getPostById,
   updatePost,
   deletePost,
-  toggleLike,
+  reactToPost,          // 🔥 NEW
   toggleApprovePost,
-  searchPosts, // ✅ ADD THIS
+  searchPosts,
 } = require("../controllers/postController");
 
 const auth = require("../middleware/authMiddleware");
 const admin = require("../middleware/adminMiddleware");
 
-
-// ====================================================
-// ⭐ SEARCH ROUTE (must be BEFORE :id route)
-// ====================================================
+// ===========================
+// 🔍 SEARCH ROUTE (ALWAYS ON TOP)
+// ===========================
 router.get("/search/query", searchPosts);
 
-
-// ====================================================
-// ⭐ PUBLIC ROUTES
-// ====================================================
-
-// Get all posts
+// ===========================
+// 🌍 PUBLIC ROUTES
+// ===========================
 router.get("/", getAllPosts);
-
-// Get single post
 router.get("/:id", getPostById);
 
-
-// ====================================================
-// 🔒 AUTHENTICATED USER ROUTES
-// ====================================================
-
-// Create post (NO image upload now)
+// ===========================
+// 🔐 AUTH REQUIRED ROUTES
+// ===========================
 router.post("/", auth, createPost);
-
-// Update post (NO image upload now)
 router.put("/:id", auth, updatePost);
-
-// Delete your own post
 router.delete("/:id", auth, deletePost);
 
-// Like / Unlike
-router.post("/:id/like", auth, toggleLike);
+// 🔥 FACEBOOK-STYLE REACTION
+// POST /posts/:id/react
+router.post("/:id/react", auth, reactToPost);
 
-
-// ====================================================
+// ===========================
 // 👑 ADMIN ROUTES
-// ====================================================
-
-// Approve / Unapprove post
+// ===========================
 router.patch("/:id/approve", auth, admin, toggleApprovePost);
-
 
 module.exports = router;

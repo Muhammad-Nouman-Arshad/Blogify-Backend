@@ -1,8 +1,7 @@
 const Post = require("../models/Post");
 
-
 // =========================================================
-//  CREATE POST
+// CREATE POST
 // =========================================================
 exports.createPost = async (req, res) => {
   try {
@@ -19,9 +18,12 @@ exports.createPost = async (req, res) => {
       author: req.user.id,
     });
 
+    const populatedPost = await Post.findById(post._id)
+      .populate("author", "name email role");
+
     return res.status(201).json({
       message: "Post created successfully",
-      post,
+      post: populatedPost,
     });
   } catch (error) {
     console.error("Create post error:", error);
@@ -29,45 +31,43 @@ exports.createPost = async (req, res) => {
   }
 };
 
-
 // =========================================================
-//  GET ALL POSTS
+// GET ALL POSTS
 // =========================================================
 exports.getAllPosts = async (req, res) => {
   try {
-    const posts = await Post.find()
-      .populate("author", "name email")
+    const posts = await Post.find({ isPublished: true })
+      .populate("author", "name email role")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json(posts);
+    res.status(200).json(posts);
   } catch (error) {
     console.error("Get posts error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
 // =========================================================
-//  GET SINGLE POST
+// GET SINGLE POST
 // =========================================================
 exports.getPostById = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate(
-      "author",
-      "name email"
-    );
+    const post = await Post.findById(req.params.id)
+      .populate("author", "name email role");
 
-    if (!post) return res.status(404).json({ message: "Post not found" });
-    return res.status(200).json(post);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    res.status(200).json(post);
   } catch (error) {
-    console.error("Get single post error:", error);
+    console.error("Get post error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
 // =========================================================
-//  UPDATE POST
+// UPDATE POST
 // =========================================================
 exports.updatePost = async (req, res) => {
   try {
@@ -80,18 +80,18 @@ exports.updatePost = async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    post.title = title || post.title;
-    post.content = content || post.content;
-
-    if (Array.isArray(categories)) {
-      post.categories = categories;
-    }
+    if (title) post.title = title;
+    if (content) post.content = content;
+    if (Array.isArray(categories)) post.categories = categories;
 
     await post.save();
 
-    return res.status(200).json({
+    const updated = await Post.findById(post._id)
+      .populate("author", "name email role");
+
+    res.status(200).json({
       message: "Post updated successfully",
-      post,
+      post: updated,
     });
   } catch (error) {
     console.error("Update post error:", error);
@@ -99,59 +99,89 @@ exports.updatePost = async (req, res) => {
   }
 };
 
-
 // =========================================================
 // DELETE POST
 // =========================================================
-
 exports.deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
 
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (post.author.toString() !== req.user.id && req.user.role !== "admin") {
+    if (
+      post.author.toString() !== req.user.id &&
+      req.user.role !== "admin"
+    ) {
       return res.status(403).json({ message: "Not authorized" });
     }
 
     await post.deleteOne();
-    return res.status(200).json({ message: "Post deleted" });
+    res.status(200).json({ message: "Post deleted" });
   } catch (error) {
     console.error("Delete post error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
 // =========================================================
-//  LIKE / UNLIKE
+// 🔥 FACEBOOK STYLE REACTIONS
+// POST /posts/:id/react
 // =========================================================
-exports.toggleLike = async (req, res) => {
+exports.reactToPost = async (req, res) => {
   try {
+    const { type } = req.body;
+    const userId = req.user.id;
+
+    const VALID_REACTIONS = [
+      "like",
+      "love",
+      "haha",
+      "wow",
+      "sad",
+      "angry",
+    ];
+
+    if (!VALID_REACTIONS.includes(type)) {
+      return res.status(400).json({ message: "Invalid reaction type" });
+    }
+
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const userId = req.user.id;
+    const existingIndex = post.reactions.findIndex(
+      (r) => r.user.toString() === userId
+    );
 
-    if (post.likes.includes(userId)) {
-      post.likes = post.likes.filter((id) => id.toString() !== userId);
-      await post.save();
-      return res.status(200).json({ message: "Post unliked", post });
+    if (existingIndex !== -1) {
+      // Same reaction → remove
+      if (post.reactions[existingIndex].type === type) {
+        post.reactions.splice(existingIndex, 1);
+      } else {
+        // Different reaction → update
+        post.reactions[existingIndex].type = type;
+      }
+    } else {
+      post.reactions.push({ user: userId, type });
     }
 
-    post.likes.push(userId);
+    post.reactionsCount = post.reactions.length;
     await post.save();
 
-    return res.status(200).json({ message: "Post liked", post });
+    const updatedPost = await Post.findById(post._id)
+      .populate("author", "name email role");
+
+    res.status(200).json({
+      message: "Reaction updated",
+      post: updatedPost,
+    });
   } catch (error) {
-    console.error("Like post error:", error);
+    console.error("Reaction error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
 // =========================================================
-//  APPROVE / UNAPPROVE POST (ADMIN)
+// ADMIN APPROVE / UNAPPROVE POST
 // =========================================================
 exports.toggleApprovePost = async (req, res) => {
   try {
@@ -161,7 +191,7 @@ exports.toggleApprovePost = async (req, res) => {
     post.isPublished = !post.isPublished;
     await post.save();
 
-    return res.status(200).json({
+    res.status(200).json({
       message: post.isPublished
         ? "Post approved & published"
         : "Post unapproved & hidden",
@@ -173,21 +203,15 @@ exports.toggleApprovePost = async (req, res) => {
   }
 };
 
-
 // =========================================================
-//  SMART SEARCH (AI-LIKE RANKING)
+// SMART SEARCH
 // =========================================================
 exports.searchPosts = async (req, res) => {
   try {
     const query = req.query.q?.toLowerCase() || "";
+    if (!query) return res.json([]);
 
-    if (!query) {
-      return res.json([]);
-    }
-
-    // break into words
     const keywords = query.split(" ");
-
     const posts = await Post.find().populate("author", "name");
 
     const scored = posts.map((post) => {
@@ -198,7 +222,6 @@ exports.searchPosts = async (req, res) => {
       const categories = post.categories.join(" ").toLowerCase();
       const author = post.author?.name?.toLowerCase() || "";
 
-      // scoring system
       keywords.forEach((k) => {
         if (title.includes(k)) score += 6;
         if (content.includes(k)) score += 4;
@@ -214,14 +237,11 @@ exports.searchPosts = async (req, res) => {
       .sort((a, b) => b.score - a.score)
       .map((s) => s.post);
 
-    // fallback: related content
     if (matched.length === 0) {
-      const related = posts.slice(0, 5);
-      return res.json({ related });
+      return res.json({ related: posts.slice(0, 5) });
     }
 
-    return res.json({ results: matched });
-
+    res.json({ results: matched });
   } catch (error) {
     console.error("Search error:", error);
     res.status(500).json({ message: "Server error" });
