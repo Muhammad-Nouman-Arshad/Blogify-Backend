@@ -4,13 +4,10 @@ const dotenv = require("dotenv");
 const morgan = require("morgan");
 const helmet = require("helmet");
 const mongoose = require("mongoose");
-const serverless = require("serverless-http");
 const errorHandler = require("./middleware/errorMiddleware");
 
-// Load env
 dotenv.config();
 
-// App
 const app = express();
 
 // MongoDB
@@ -39,7 +36,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Logger
-if (process.env.NODE_ENV === "development") {
+if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
 }
 
@@ -50,19 +47,13 @@ app.use("/api/posts", require("./routes/postRoutes"));
 app.use("/api/comments", require("./routes/commentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 
-// Root test
+// Root (TEST)
 app.get("/", (req, res) => {
   res.send("Blogify Backend Running on Vercel 🚀");
 });
 
-// 404
-app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
-});
-
-// Error handler
+// Error Handler
 app.use(errorHandler);
 
-// ❌ DO NOT use app.listen() on Vercel
-// ✅ Export serverless handler
-module.exports = serverless(app);
+// ❌ DO NOT app.listen() on Vercel
+module.exports = app;
