@@ -8,20 +8,24 @@ exports.createPost = async (req, res) => {
     const { title, content, categories } = req.body;
 
     if (!title || !content) {
-      return res.status(400).json({ message: "Title and content are required" });
+      return res
+        .status(400)
+        .json({ message: "Title and content are required" });
     }
 
     const post = await Post.create({
       title,
       content,
-      categories: Array.isArray(categories) ? categories : [],
+      categories: Array.isArray(categories) ? categories : ["General"],
       author: req.user.id,
     });
 
-    const populatedPost = await Post.findById(post._id)
-      .populate("author", "name email role");
+    const populatedPost = await Post.findById(post._id).populate(
+      "author",
+      "name email role"
+    );
 
-    return res.status(201).json({
+    res.status(201).json({
       message: "Post created successfully",
       post: populatedPost,
     });
@@ -32,7 +36,7 @@ exports.createPost = async (req, res) => {
 };
 
 // =========================================================
-// GET ALL POSTS
+// GET ALL POSTS (PUBLIC)
 // =========================================================
 exports.getAllPosts = async (req, res) => {
   try {
@@ -52,8 +56,10 @@ exports.getAllPosts = async (req, res) => {
 // =========================================================
 exports.getPostById = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id)
-      .populate("author", "name email role");
+    const post = await Post.findById(req.params.id).populate(
+      "author",
+      "name email role"
+    );
 
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
@@ -67,31 +73,43 @@ exports.getPostById = async (req, res) => {
 };
 
 // =========================================================
-// UPDATE POST
+// UPDATE POST (ADMIN OR AUTHOR ONLY) 🔥 FIXED
 // =========================================================
 exports.updatePost = async (req, res) => {
   try {
-    const { title, content, categories } = req.body;
+    const { title, content, categories, tags } = req.body;
 
     const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ message: "Post not found" });
-
-    if (post.author.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Not authorized" });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
     }
 
-    if (title) post.title = title;
-    if (content) post.content = content;
+    // 🔐 AUTHORIZATION
+    if (
+      post.author.toString() !== req.user.id &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "You are not allowed to edit this post" });
+    }
+
+    // ✅ SAFE UPDATE
+    if (title !== undefined) post.title = title;
+    if (content !== undefined) post.content = content;
     if (Array.isArray(categories)) post.categories = categories;
+    if (Array.isArray(tags)) post.tags = tags;
 
-    await post.save();
+    await post.save(); // 🔥 slug middleware triggers here
 
-    const updated = await Post.findById(post._id)
-      .populate("author", "name email role");
+    const updatedPost = await Post.findById(post._id).populate(
+      "author",
+      "name email role"
+    );
 
     res.status(200).json({
       message: "Post updated successfully",
-      post: updated,
+      post: updatedPost,
     });
   } catch (error) {
     console.error("Update post error:", error);
@@ -100,13 +118,15 @@ exports.updatePost = async (req, res) => {
 };
 
 // =========================================================
-// DELETE POST
+// DELETE POST (ADMIN OR AUTHOR)
 // =========================================================
 exports.deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
 
-    if (!post) return res.status(404).json({ message: "Post not found" });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
 
     if (
       post.author.toString() !== req.user.id &&
@@ -116,7 +136,8 @@ exports.deletePost = async (req, res) => {
     }
 
     await post.deleteOne();
-    res.status(200).json({ message: "Post deleted" });
+
+    res.status(200).json({ message: "Post deleted successfully" });
   } catch (error) {
     console.error("Delete post error:", error);
     res.status(500).json({ message: "Server error" });
@@ -125,7 +146,6 @@ exports.deletePost = async (req, res) => {
 
 // =========================================================
 // 🔥 FACEBOOK STYLE REACTIONS
-// POST /posts/:id/react
 // =========================================================
 exports.reactToPost = async (req, res) => {
   try {
@@ -153,11 +173,9 @@ exports.reactToPost = async (req, res) => {
     );
 
     if (existingIndex !== -1) {
-      // Same reaction → remove
       if (post.reactions[existingIndex].type === type) {
         post.reactions.splice(existingIndex, 1);
       } else {
-        // Different reaction → update
         post.reactions[existingIndex].type = type;
       }
     } else {
@@ -167,11 +185,13 @@ exports.reactToPost = async (req, res) => {
     post.reactionsCount = post.reactions.length;
     await post.save();
 
-    const updatedPost = await Post.findById(post._id)
-      .populate("author", "name email role");
+    const updatedPost = await Post.findById(post._id).populate(
+      "author",
+      "name email role"
+    );
 
     res.status(200).json({
-      message: "Reaction updated",
+      message: "Reaction updated successfully",
       post: updatedPost,
     });
   } catch (error) {
@@ -212,7 +232,10 @@ exports.searchPosts = async (req, res) => {
     if (!query) return res.json([]);
 
     const keywords = query.split(" ");
-    const posts = await Post.find().populate("author", "name");
+    const posts = await Post.find({ isPublished: true }).populate(
+      "author",
+      "name"
+    );
 
     const scored = posts.map((post) => {
       let score = 0;
@@ -237,11 +260,9 @@ exports.searchPosts = async (req, res) => {
       .sort((a, b) => b.score - a.score)
       .map((s) => s.post);
 
-    if (matched.length === 0) {
-      return res.json({ related: posts.slice(0, 5) });
-    }
-
-    res.json({ results: matched });
+    res.json(
+      matched.length ? { results: matched } : { related: posts.slice(0, 5) }
+    );
   } catch (error) {
     console.error("Search error:", error);
     res.status(500).json({ message: "Server error" });
