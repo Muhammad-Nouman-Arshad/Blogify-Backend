@@ -1,9 +1,9 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
 
-const authMiddleware = async (req, res, next) => {
+const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
+  // 🔐 Token check
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Not authorized, token missing" });
   }
@@ -11,18 +11,13 @@ const authMiddleware = async (req, res, next) => {
   try {
     const token = authHeader.split(" ")[1];
 
+    // 🔓 Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 🔐 Just verify user exists
-    const userExists = await User.exists({ _id: decoded.id });
-    if (!userExists) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    // ✅ TRUST JWT FOR ROLE
+    // ✅ USER INFO FROM JWT (SOURCE OF TRUTH)
     req.user = {
       id: decoded.id,
-      role: decoded.role,
+      role: decoded.role, // 🔥 admin / user
     };
 
     next();

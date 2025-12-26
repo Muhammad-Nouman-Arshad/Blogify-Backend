@@ -5,7 +5,7 @@ const Post = require("../models/Post");
 // =========================================================
 exports.createPost = async (req, res) => {
   try {
-    const { title, content, categories } = req.body;
+    const { title, content, categories, tags } = req.body;
 
     if (!title || !content) {
       return res
@@ -17,6 +17,7 @@ exports.createPost = async (req, res) => {
       title,
       content,
       categories: Array.isArray(categories) ? categories : ["General"],
+      tags: Array.isArray(tags) ? tags : [],
       author: req.user.id,
     });
 
@@ -73,7 +74,7 @@ exports.getPostById = async (req, res) => {
 };
 
 // =========================================================
-// UPDATE POST (ADMIN OR AUTHOR ONLY) 🔥 FIXED
+// UPDATE POST (ADMIN OR AUTHOR) ⭐ FINAL FIX
 // =========================================================
 exports.updatePost = async (req, res) => {
   try {
@@ -85,13 +86,13 @@ exports.updatePost = async (req, res) => {
     }
 
     // 🔐 AUTHORIZATION
-    if (
-      post.author.toString() !== req.user.id &&
-      req.user.role !== "admin"
-    ) {
-      return res
-        .status(403)
-        .json({ message: "You are not allowed to edit this post" });
+    const isAuthor = post.author.toString() === req.user.id;
+    const isAdmin = req.user.role === "admin";
+
+    if (!isAuthor && !isAdmin) {
+      return res.status(403).json({
+        message: "Only admin or post creator can edit this post",
+      });
     }
 
     // ✅ SAFE UPDATE
@@ -100,7 +101,7 @@ exports.updatePost = async (req, res) => {
     if (Array.isArray(categories)) post.categories = categories;
     if (Array.isArray(tags)) post.tags = tags;
 
-    await post.save(); // 🔥 slug middleware triggers here
+    await post.save(); // 🔥 slug middleware runs here
 
     const updatedPost = await Post.findById(post._id).populate(
       "author",
@@ -123,20 +124,18 @@ exports.updatePost = async (req, res) => {
 exports.deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    if (
-      post.author.toString() !== req.user.id &&
-      req.user.role !== "admin"
-    ) {
+    const isAuthor = post.author.toString() === req.user.id;
+    const isAdmin = req.user.role === "admin";
+
+    if (!isAuthor && !isAdmin) {
       return res.status(403).json({ message: "Not authorized" });
     }
 
     await post.deleteOne();
-
     res.status(200).json({ message: "Post deleted successfully" });
   } catch (error) {
     console.error("Delete post error:", error);
