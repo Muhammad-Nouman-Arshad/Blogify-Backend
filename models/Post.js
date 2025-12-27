@@ -10,7 +10,6 @@ const VALID_CATEGORIES = [
   "Entertainment",
 ];
 
-// 🔥 VALID REACTIONS (Facebook style)
 const VALID_REACTIONS = [
   "like",
   "love",
@@ -33,7 +32,6 @@ const postSchema = new mongoose.Schema(
       required: true,
     },
 
-    // SEO Friendly URL Slug
     slug: {
       type: String,
       unique: true,
@@ -46,25 +44,22 @@ const postSchema = new mongoose.Schema(
       required: true,
     },
 
-    // ⭐ MULTIPLE CATEGORIES
     categories: {
       type: [String],
       default: ["General"],
       validate: {
-        validator: function (arr) {
-          return arr.every((cat) => VALID_CATEGORIES.includes(cat));
-        },
+        validator: (arr) =>
+          arr.every((cat) => VALID_CATEGORIES.includes(cat)),
         message: "Invalid category selected",
       },
     },
 
-    // ⭐ TAG SYSTEM (future-ready)
     tags: {
       type: [String],
       default: [],
     },
 
-    // 🔥 FACEBOOK-STYLE REACTIONS
+    // 🔥 REACTIONS
     reactions: [
       {
         user: {
@@ -80,13 +75,17 @@ const postSchema = new mongoose.Schema(
       },
     ],
 
-    // 📊 QUICK COUNT (for performance)
+    // 📊 COUNTERS (USED BY DASHBOARD)
     reactionsCount: {
       type: Number,
       default: 0,
     },
 
-    // ADMIN APPROVAL
+    commentsCount: {
+      type: Number,
+      default: 0,
+    },
+
     isPublished: {
       type: Boolean,
       default: true,
@@ -95,9 +94,7 @@ const postSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ======================================================
-// 🔥 AUTO CREATE SLUG BEFORE SAVE
-// ======================================================
+// 🔥 AUTO SLUG
 postSchema.pre("save", function (next) {
   if (this.isModified("title")) {
     this.slug = this.title

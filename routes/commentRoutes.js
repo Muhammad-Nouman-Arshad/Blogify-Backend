@@ -1,4 +1,3 @@
-// routes/commentRoutes.js
 const express = require("express");
 const router = express.Router();
 
@@ -14,16 +13,34 @@ const {
   getRecentComments,
 } = require("../controllers/commentController");
 
-// --------------------- PUBLIC ---------------------
+// ==================================================
+// PUBLIC ROUTES
+// ==================================================
+
+// Get all comments for a post
 router.get("/post/:postId", getCommentsByPost);
 
-// --------------------- USER AUTH ---------------------
+// ==================================================
+// AUTHENTICATED USER ROUTES
+// ==================================================
+
+// Add comment to a post
 router.post("/post/:postId", auth, addComment);
+
+// Edit own comment
 router.put("/:commentId", auth, editComment);
+
+// Delete own comment (admin can delete any)
 router.delete("/:commentId", auth, deleteComment);
+
+// Reply to a comment
 router.post("/reply/:commentId", auth, replyToComment);
 
-// --------------------- ADMIN ONLY ---------------------
+// ==================================================
+// ADMIN ROUTES
+// ==================================================
+
+// Get recent comments (admin dashboard)
 router.get("/admin/recent", auth, admin, getRecentComments);
 
 module.exports = router;

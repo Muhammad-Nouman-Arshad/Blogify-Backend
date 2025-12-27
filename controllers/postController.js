@@ -19,6 +19,10 @@ exports.createPost = async (req, res) => {
       categories: Array.isArray(categories) ? categories : ["General"],
       tags: Array.isArray(tags) ? tags : [],
       author: req.user.id,
+
+      // 🔥 IMPORTANT: initialize counters
+      reactionsCount: 0,
+      commentsCount: 0,
     });
 
     const populatedPost = await Post.findById(post._id).populate(
@@ -74,7 +78,7 @@ exports.getPostById = async (req, res) => {
 };
 
 // =========================================================
-// UPDATE POST (ADMIN OR AUTHOR) ⭐ FINAL FIX
+// UPDATE POST (ADMIN OR AUTHOR)
 // =========================================================
 exports.updatePost = async (req, res) => {
   try {
@@ -85,7 +89,6 @@ exports.updatePost = async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // 🔐 AUTHORIZATION
     const isAuthor = post.author.toString() === req.user.id;
     const isAdmin = req.user.role === "admin";
 
@@ -95,13 +98,12 @@ exports.updatePost = async (req, res) => {
       });
     }
 
-    // ✅ SAFE UPDATE
     if (title !== undefined) post.title = title;
     if (content !== undefined) post.content = content;
     if (Array.isArray(categories)) post.categories = categories;
     if (Array.isArray(tags)) post.tags = tags;
 
-    await post.save(); // 🔥 slug middleware runs here
+    await post.save(); // slug middleware runs here
 
     const updatedPost = await Post.findById(post._id).populate(
       "author",
@@ -144,7 +146,7 @@ exports.deletePost = async (req, res) => {
 };
 
 // =========================================================
-// 🔥 FACEBOOK STYLE REACTIONS
+// FACEBOOK-STYLE REACTIONS
 // =========================================================
 exports.reactToPost = async (req, res) => {
   try {
@@ -231,10 +233,9 @@ exports.searchPosts = async (req, res) => {
     if (!query) return res.json([]);
 
     const keywords = query.split(" ");
-    const posts = await Post.find({ isPublished: true }).populate(
-      "author",
-      "name"
-    );
+
+    const posts = await Post.find({ isPublished: true })
+      .populate("author", "name");
 
     const scored = posts.map((post) => {
       let score = 0;
@@ -267,3 +268,4 @@ exports.searchPosts = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
